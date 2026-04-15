@@ -1,0 +1,692 @@
+{
+  "nbformat": 4,
+  "nbformat_minor": 0,
+  "metadata": {
+    "colab": {
+      "provenance": []
+    },
+    "kernelspec": {
+      "name": "python3",
+      "display_name": "Python 3"
+    },
+    "language_info": {
+      "name": "python"
+    }
+  },
+  "cells": [
+    {
+      "cell_type": "markdown",
+      "source": [
+        "# Olympic Power Structure — Data Preparation\n",
+        "\n",
+        "In this notebook, I prepare the Olympic dataset for the final data storytelling project.\n",
+        "\n",
+        "## Goal\n",
+        "Transform the raw athlete-level Olympic dataset into a clean country-year dataset that can be used for visualization and storytelling.\n",
+        "\n",
+        "## Main preparation steps\n",
+        "- import the Excel file\n",
+        "- inspect the structure of the dataset\n",
+        "- isolate medal-winning records\n",
+        "- avoid double-counting team medals\n",
+        "- aggregate medals by country and year\n",
+        "- export a clean dataset for later analysis"
+      ],
+      "metadata": {
+        "id": "-CgWBzOu5p7d"
+      }
+    },
+    {
+      "cell_type": "code",
+      "source": [
+        "import pandas as pd\n",
+        "import numpy as np\n",
+        "import matplotlib.pyplot as plt\n",
+        "\n",
+        "pd.set_option(\"display.max_columns\", None)\n",
+        "pd.set_option(\"display.max_rows\", 200)"
+      ],
+      "metadata": {
+        "id": "GkDxA0iu5zY4"
+      },
+      "execution_count": null,
+      "outputs": []
+    },
+    {
+      "cell_type": "code",
+      "source": [
+        "from google.colab import files\n",
+        "\n",
+        "uploaded = files.upload()"
+      ],
+      "metadata": {
+        "id": "8rIDkI1w6B4k"
+      },
+      "execution_count": null,
+      "outputs": []
+    },
+    {
+      "cell_type": "code",
+      "source": [
+        "file_name = \"ds proj.xlsx\"\n",
+        "xls = pd.ExcelFile(file_name)\n",
+        "\n",
+        "print(\"Sheets found in the Excel file:\")\n",
+        "print(xls.sheet_names)"
+      ],
+      "metadata": {
+        "id": "oj17RXg86ubT"
+      },
+      "execution_count": null,
+      "outputs": []
+    },
+    {
+      "cell_type": "markdown",
+      "source": [
+        "## 2. Load the main worksheet\n",
+        "\n",
+        "The worksheet `athlete_events` contains the Olympic observations at athlete-event level."
+      ],
+      "metadata": {
+        "id": "jGIPH_qr65wB"
+      }
+    },
+    {
+      "cell_type": "code",
+      "source": [
+        "df = pd.read_excel(file_name, sheet_name=\"athlete_events\")\n",
+        "print(\"Dataset shape:\", df.shape)\n",
+        "df.head()"
+      ],
+      "metadata": {
+        "id": "vm7Rv0kh69hu"
+      },
+      "execution_count": null,
+      "outputs": []
+    },
+    {
+      "cell_type": "markdown",
+      "source": [
+        "## 3. Inspect the raw dataset\n",
+        "\n",
+        "Each row represents one athlete participating in one Olympic event.\n",
+        "\n",
+        "At this stage, I inspect:\n",
+        "- the variables available\n",
+        "- their data types\n",
+        "- missing values"
+      ],
+      "metadata": {
+        "id": "d3o3b8we7mI9"
+      }
+    },
+    {
+      "cell_type": "code",
+      "source": [
+        "print(\"Columns:\")\n",
+        "print(df.columns.tolist())"
+      ],
+      "metadata": {
+        "id": "5vXvodb57o7c"
+      },
+      "execution_count": null,
+      "outputs": []
+    },
+    {
+      "cell_type": "code",
+      "source": [
+        "df.info()"
+      ],
+      "metadata": {
+        "id": "Ocied0RR7r1j"
+      },
+      "execution_count": null,
+      "outputs": []
+    },
+    {
+      "cell_type": "code",
+      "source": [
+        "df.isna().sum().sort_values(ascending=False)"
+      ],
+      "metadata": {
+        "id": "EEuMlwGs7vAA"
+      },
+      "execution_count": null,
+      "outputs": []
+    },
+    {
+      "cell_type": "markdown",
+      "source": [
+        "## 4. Initial interpretation of missing values\n",
+        "\n",
+        "The missing values are concentrated in athlete-specific variables such as `Age`, `Height`, and `Weight`, and especially in `Medal`.\n",
+        "\n",
+        "This is expected:\n",
+        "- most athletes do not win a medal, so `Medal` is missing for a large number of rows\n",
+        "- some athlete characteristics are incomplete in historical records\n",
+        "\n",
+        "Since the project focuses on country-level medal performance, these missing values do not prevent the analysis."
+      ],
+      "metadata": {
+        "id": "j_5Zf7lC8cLI"
+      }
+    },
+    {
+      "cell_type": "markdown",
+      "source": [
+        "## 5. Select the variables needed for the analysis\n",
+        "\n",
+        "The original dataset contains athlete-level information, but the project focuses on Olympic success at country level.\n",
+        "\n",
+        "At this stage, I keep only the variables needed to identify:\n",
+        "- the country\n",
+        "- the Olympic edition\n",
+        "- the sport and event\n",
+        "- the medal outcome"
+      ],
+      "metadata": {
+        "id": "9jrdJHo48lW2"
+      }
+    },
+    {
+      "cell_type": "code",
+      "source": [
+        "cols_needed = [\n",
+        "    \"Name\", \"Team\", \"NOC\", \"Year\", \"Games\", \"Season\",\n",
+        "    \"City\", \"Sport\", \"Event\", \"Medal\"\n",
+        "]\n",
+        "\n",
+        "olympics = df[cols_needed].copy()\n",
+        "\n",
+        "print(\"Shape of reduced dataset:\", olympics.shape)\n",
+        "olympics.head()"
+      ],
+      "metadata": {
+        "id": "wPjfc3fx8o6I"
+      },
+      "execution_count": null,
+      "outputs": []
+    },
+    {
+      "cell_type": "markdown",
+      "source": [
+        "## 6. Keep only medal-winning observations\n",
+        "\n",
+        "Only rows with a non-missing value in `Medal` correspond to medal-winning athletes.\n",
+        "This subset is the starting point for measuring Olympic success."
+      ],
+      "metadata": {
+        "id": "n9SUr8XN8xi8"
+      }
+    },
+    {
+      "cell_type": "code",
+      "source": [
+        "medals_raw = olympics[olympics[\"Medal\"].notna()].copy()\n",
+        "\n",
+        "print(\"Rows with medals:\", medals_raw.shape[0])\n",
+        "medals_raw.head()"
+      ],
+      "metadata": {
+        "id": "BljGsjJJ8z5j"
+      },
+      "execution_count": null,
+      "outputs": []
+    },
+    {
+      "cell_type": "markdown",
+      "source": [
+        "## 7. Inspect medal categories\n",
+        "\n",
+        "Before aggregation, I verify the distribution of medal types."
+      ],
+      "metadata": {
+        "id": "d_7Bqzme84Hs"
+      }
+    },
+    {
+      "cell_type": "code",
+      "source": [
+        "medals_raw[\"Medal\"].value_counts()"
+      ],
+      "metadata": {
+        "id": "FdeklTj887TE"
+      },
+      "execution_count": null,
+      "outputs": []
+    },
+    {
+      "cell_type": "code",
+      "source": [
+        "medals_raw[\"Medal\"].value_counts(normalize=True) * 100"
+      ],
+      "metadata": {
+        "id": "zkaWzT5B9BB7"
+      },
+      "execution_count": null,
+      "outputs": []
+    },
+    {
+      "cell_type": "markdown",
+      "source": [
+        "## Interpretation of medal distribution\n",
+        "\n",
+        "The distribution of medal types is approximately balanced:\n",
+        "- Gold: ~33.6%\n",
+        "- Silver: ~33.0%\n",
+        "- Bronze: ~33.4%\n",
+        "\n",
+        "This is expected, since each Olympic event awards exactly one gold, one silver, and one bronze medal.\n",
+        "\n",
+        "This confirms that the dataset is consistent and that no major bias is introduced before aggregation.\n",
+        "\n",
+        "However, this balance is observed at the athlete level, and not yet at the country level.  \n",
+        "In the next step, I correct for the over-representation of team sports by deduplicating medals at the event level."
+      ],
+      "metadata": {
+        "id": "Q8jVNp-i9IRl"
+      }
+    },
+    {
+      "cell_type": "markdown",
+      "source": [
+        "## 8. Why deduplication is necessary\n",
+        "\n",
+        "The dataset records medals at athlete level, not at country-event level.\n",
+        "\n",
+        "This creates an important issue in team sports:\n",
+        "if a national team wins one medal, the dataset contains one row for each athlete in that team.\n",
+        "\n",
+        "If I simply count medal rows, I would overestimate country performance.\n",
+        "\n",
+        "To correct this, I deduplicate the data so that each medal is counted only once for a given:\n",
+        "- country (`NOC`)\n",
+        "- Olympic edition (`Games`, `Year`, `Season`)\n",
+        "- sport\n",
+        "- event\n",
+        "- medal type"
+      ],
+      "metadata": {
+        "id": "7ZwEWWPx9WpY"
+      }
+    },
+    {
+      "cell_type": "code",
+      "source": [
+        "medals_unique = medals_raw.drop_duplicates(\n",
+        "    subset=[\"NOC\", \"Games\", \"Year\", \"Season\", \"Sport\", \"Event\", \"Medal\"]\n",
+        ").copy()\n",
+        "\n",
+        "print(\"Before deduplication:\", medals_raw.shape[0])\n",
+        "print(\"After deduplication:\", medals_unique.shape[0])"
+      ],
+      "metadata": {
+        "id": "Met1D02c9cnK"
+      },
+      "execution_count": null,
+      "outputs": []
+    },
+    {
+      "cell_type": "code",
+      "source": [
+        "medals_unique.head()"
+      ],
+      "metadata": {
+        "id": "vbeSYCZA9hBv"
+      },
+      "execution_count": null,
+      "outputs": []
+    },
+    {
+      "cell_type": "code",
+      "source": [
+        "print(\"Removed duplicated athlete-level medal rows:\",\n",
+        "      medals_raw.shape[0] - medals_unique.shape[0])"
+      ],
+      "metadata": {
+        "id": "xpwl3WjM9j7V"
+      },
+      "execution_count": null,
+      "outputs": []
+    },
+    {
+      "cell_type": "markdown",
+      "source": [
+        "## Impact of deduplication\n",
+        "\n",
+        "Before deduplication, the dataset contains 39,783 medal-winning observations.\n",
+        "\n",
+        "After removing duplicates at the country-event level, this number drops to 18,905.\n",
+        "\n",
+        "This means that 20,878 rows corresponded to duplicated medals due to team events.\n",
+        "\n",
+        "In other words, more than half of the medal records were overcounted when considering athlete-level data.\n",
+        "\n",
+        "This confirms that deduplication is a crucial preprocessing step to correctly measure country-level Olympic performance.\n",
+        "\n",
+        "Without this correction, countries performing well in team sports would be significantly overestimated."
+      ],
+      "metadata": {
+        "id": "tKk3WT5x-igN"
+      }
+    },
+    {
+      "cell_type": "markdown",
+      "source": [
+        "## 10. Aggregate medals by country and year\n",
+        "\n",
+        "I now build a country-year table to study Olympic performance over time.\n",
+        "\n",
+        "For each country and year, I compute:\n",
+        "- gold medals\n",
+        "- silver medals\n",
+        "- bronze medals\n",
+        "- total medals"
+      ],
+      "metadata": {
+        "id": "Zw8f-gHs-u-o"
+      }
+    },
+    {
+      "cell_type": "code",
+      "source": [
+        "country_year = (\n",
+        "    medals_unique\n",
+        "    .groupby([\"NOC\", \"Year\", \"Medal\"])\n",
+        "    .size()\n",
+        "    .unstack(fill_value=0)\n",
+        "    .reset_index()\n",
+        ")\n",
+        "\n",
+        "country_year.head()"
+      ],
+      "metadata": {
+        "id": "Nv2iXUDH-yIJ"
+      },
+      "execution_count": null,
+      "outputs": []
+    },
+    {
+      "cell_type": "code",
+      "source": [
+        "for col in [\"Gold\", \"Silver\", \"Bronze\"]:\n",
+        "    if col not in country_year.columns:\n",
+        "        country_year[col] = 0\n",
+        "\n",
+        "country_year[\"Total_Medals\"] = (\n",
+        "    country_year[\"Gold\"] + country_year[\"Silver\"] + country_year[\"Bronze\"]\n",
+        ")\n",
+        "\n",
+        "country_year = country_year[[\"NOC\", \"Year\", \"Gold\", \"Silver\", \"Bronze\", \"Total_Medals\"]]\n",
+        "\n",
+        "country_year.head()"
+      ],
+      "metadata": {
+        "id": "oHdsx0Gx-2At"
+      },
+      "execution_count": null,
+      "outputs": []
+    },
+    {
+      "cell_type": "markdown",
+      "source": [
+        "## 11. Compute annual country rankings\n",
+        "\n",
+        "To compare Olympic power across countries, I rank countries within each year.\n",
+        "\n",
+        "The ranking is based primarily on:\n",
+        "- total medals\n",
+        "- then gold, silver, and bronze medals"
+      ],
+      "metadata": {
+        "id": "SAj1hLzJ-630"
+      }
+    },
+    {
+      "cell_type": "code",
+      "source": [
+        "country_year = country_year.sort_values(\n",
+        "    by=[\"Year\", \"Total_Medals\", \"Gold\", \"Silver\", \"Bronze\"],\n",
+        "    ascending=[True, False, False, False, False]\n",
+        ").copy()\n",
+        "\n",
+        "country_year[\"Rank\"] = (\n",
+        "    country_year.groupby(\"Year\")[\"Total_Medals\"]\n",
+        "    .rank(method=\"dense\", ascending=False)\n",
+        "    .astype(int)\n",
+        ")\n",
+        "\n",
+        "country_year.head(20)"
+      ],
+      "metadata": {
+        "id": "pPv9ZZ1o-_Hk"
+      },
+      "execution_count": null,
+      "outputs": []
+    },
+    {
+      "cell_type": "markdown",
+      "source": [
+        "## 12. Compute the total medal pool of each year\n",
+        "\n",
+        "This allows me to measure how much of the available medal pool is captured by each country."
+      ],
+      "metadata": {
+        "id": "81N_YyCM_D_g"
+      }
+    },
+    {
+      "cell_type": "code",
+      "source": [
+        "year_totals = (\n",
+        "    country_year.groupby(\"Year\")[\"Total_Medals\"]\n",
+        "    .sum()\n",
+        "    .reset_index()\n",
+        "    .rename(columns={\"Total_Medals\": \"Year_Total_Medals\"})\n",
+        ")\n",
+        "\n",
+        "year_totals.head()"
+      ],
+      "metadata": {
+        "id": "wsP181_V_Gy8"
+      },
+      "execution_count": null,
+      "outputs": []
+    },
+    {
+      "cell_type": "code",
+      "source": [
+        "country_year = country_year.merge(year_totals, on=\"Year\", how=\"left\")\n",
+        "\n",
+        "country_year[\"Medal_Share\"] = (\n",
+        "    country_year[\"Total_Medals\"] / country_year[\"Year_Total_Medals\"]\n",
+        ")\n",
+        "\n",
+        "country_year.head()"
+      ],
+      "metadata": {
+        "id": "knA5bpA2_Kkj"
+      },
+      "execution_count": null,
+      "outputs": []
+    },
+    {
+      "cell_type": "markdown",
+      "source": [
+        "## 13. Identify top-performing countries\n",
+        "\n",
+        "I add a binary variable indicating whether a country belongs to the top 10 of a given Olympic year.\n",
+        "This will be useful for concentration and dominance analysis."
+      ],
+      "metadata": {
+        "id": "pebEjqSk_NnN"
+      }
+    },
+    {
+      "cell_type": "code",
+      "source": [
+        "country_year[\"Top10_Flag\"] = country_year[\"Rank\"] <= 10\n",
+        "country_year.head()"
+      ],
+      "metadata": {
+        "id": "31QUMbzl_QX2"
+      },
+      "execution_count": null,
+      "outputs": []
+    },
+    {
+      "cell_type": "markdown",
+      "source": [
+        "## 14. Final checks on the cleaned dataset"
+      ],
+      "metadata": {
+        "id": "Y766gXJp_eFH"
+      }
+    },
+    {
+      "cell_type": "code",
+      "source": [
+        "print(\"Final shape:\", country_year.shape)\n",
+        "country_year.info()"
+      ],
+      "metadata": {
+        "id": "_oIo-d-__gAZ"
+      },
+      "execution_count": null,
+      "outputs": []
+    },
+    {
+      "cell_type": "code",
+      "source": [
+        "country_year.isna().sum()"
+      ],
+      "metadata": {
+        "id": "pbgJ7fua_jZA"
+      },
+      "execution_count": null,
+      "outputs": []
+    },
+    {
+      "cell_type": "code",
+      "source": [
+        "country_year.sort_values([\"Year\", \"Rank\"]).head(30)"
+      ],
+      "metadata": {
+        "id": "tDV4KFAh_mAq"
+      },
+      "execution_count": null,
+      "outputs": []
+    },
+    {
+      "cell_type": "code",
+      "source": [
+        "country_year.sort_values([\"Year\", \"Rank\"]).head(30)"
+      ],
+      "metadata": {
+        "id": "w8AgwDz6_pUL"
+      },
+      "execution_count": null,
+      "outputs": []
+    },
+    {
+      "cell_type": "markdown",
+      "source": [
+        "## 15. Quick sanity check\n",
+        "\n",
+        "As a first validation step, I visualize the top 10 countries for the most recent Olympic year in the cleaned dataset."
+      ],
+      "metadata": {
+        "id": "6a6ZkCn1_tvO"
+      }
+    },
+    {
+      "cell_type": "code",
+      "source": [
+        "latest_year = country_year[\"Year\"].max()\n",
+        "latest_year"
+      ],
+      "metadata": {
+        "id": "xrVeu02H_wVO"
+      },
+      "execution_count": null,
+      "outputs": []
+    },
+    {
+      "cell_type": "code",
+      "source": [
+        "plot_df = (\n",
+        "    country_year[country_year[\"Year\"] == latest_year]\n",
+        "    .sort_values(\"Total_Medals\", ascending=False)\n",
+        "    .head(10)\n",
+        ")\n",
+        "\n",
+        "plot_df"
+      ],
+      "metadata": {
+        "id": "YYG7PiQm_ze2"
+      },
+      "execution_count": null,
+      "outputs": []
+    },
+    {
+      "cell_type": "code",
+      "source": [
+        "plt.figure(figsize=(10, 5))\n",
+        "plt.bar(plot_df[\"NOC\"], plot_df[\"Total_Medals\"])\n",
+        "plt.title(f\"Top 10 countries by medals in {latest_year}\")\n",
+        "plt.xlabel(\"Country (NOC)\")\n",
+        "plt.ylabel(\"Total medals\")\n",
+        "plt.xticks(rotation=45)\n",
+        "plt.show()"
+      ],
+      "metadata": {
+        "id": "22VEO5-X_2nM"
+      },
+      "execution_count": null,
+      "outputs": []
+    },
+    {
+      "cell_type": "markdown",
+      "source": [
+        "## Interpretation of initial visualization\n",
+        "\n",
+        "The latest Olympic year available in the dataset is 2016.\n",
+        "\n",
+        "The bar chart of the top 10 countries shows a clear dominance pattern:\n",
+        "a small number of countries win a disproportionately large number of medals.\n",
+        "\n",
+        "This first visualization already suggests a key insight for the project:\n",
+        "Olympic success is not evenly distributed across countries.\n",
+        "\n",
+        "In the next phase, I will explore this concentration more systematically."
+      ],
+      "metadata": {
+        "id": "2XD8zAbtAzEm"
+      }
+    },
+    {
+      "cell_type": "code",
+      "source": [
+        "country_year.to_csv(\"olympics_country_year.csv\", index=False)\n",
+        "print(\"Export completed: olympics_country_year.csv\")"
+      ],
+      "metadata": {
+        "id": "RcgXAucZA8Hq"
+      },
+      "execution_count": null,
+      "outputs": []
+    },
+    {
+      "cell_type": "code",
+      "source": [
+        "from google.colab import files\n",
+        "files.download(\"olympics_country_year.csv\")"
+      ],
+      "metadata": {
+        "id": "UzoXyU9lA-2T"
+      },
+      "execution_count": null,
+      "outputs": []
+    }
+  ]
+}
