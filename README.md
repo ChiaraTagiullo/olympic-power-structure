@@ -46,7 +46,7 @@ Main points:
 
 ## 4. Specialization Analysis
 
-The final step focuses on countries’ specialization in specific sports.
+This step focuses on countries’ specialization in specific sports.
 
 Key analyses:
 
@@ -55,3 +55,10 @@ Key analyses:
 * Heatmap visualizations to highlight specialization patterns
 
 ---
+## 5. Additional Olympic Dynamics
+
+In this section, we extend the analysis by exploring additional dynamics of Olympic performance.
+
+* Summer vs Winter Olympics: Do countries perform similarly across the two Olympic seasons, or do they specialize?
+* Evolution over time: How has Olympic performance changed across different editions of the Games?
+* Home advantage: Do host countries perform better when they organize the Olympic Games?
